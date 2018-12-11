@@ -11,6 +11,7 @@
 #define NUM_SENSORS (2)
 const byte sensor_pins[NUM_SENSORS] = {0, 1};
 const int sensor_thresholds[NUM_SENSORS] = {100, 100}; //Used in case the sensors read different values
+const byte midi_channels[NUM_SENSORS] = {0, 1}; //MIDI channels to output on. I think you can make this the same value if you want the sensors to all drive the same MIDI channel.
 
 #define LOOP_SLEEP_MS (100) // Milliseconds to sleep/delay at the end of each loop iteration.
 
@@ -34,8 +35,6 @@ byte pitches[NUM_SENSORS];
 //Set this to PITCH_CHANGE_MODE if you want pitch to change up and down. 
 //Set this to VELOCITY_CHANGE_MODE if you want velocity to change up and down.
 byte mode = VELOCITY_CHANGE_MODE;
-
-byte channel = 0; //MIDI channel to output on. I'm not sure what happens if you change this.
 
 void setup() {
   //Initialize the default values
@@ -93,7 +92,7 @@ void decrease_pitch(int sensor_num) {
 }
 
 
-void set_midi(byte pitch, byte velocity) {
+void set_midi(byte channel, byte pitch, byte velocity) {
 #ifndef SERIAL_DEBUG //Prevents this following from being executed if in serial debug mode
   midiEventPacket_t noteOn = {0x09, (byte)(0x90 | channel), pitch, velocity};
   MidiUSB.sendMIDI(noteOn);
@@ -124,7 +123,7 @@ void loop() {
       }
     }
 
-    set_midi(pitches[sensor_num], velocities[sensor_num]);
+    set_midi(midi_channels[sensor_num], pitches[sensor_num], velocities[sensor_num]);
   }
   delay(LOOP_SLEEP_MS);
 }
