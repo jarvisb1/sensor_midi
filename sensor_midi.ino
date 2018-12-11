@@ -8,8 +8,10 @@
 //Uncomment the line below to enable the serial port for debugging. Comment it out to disable the serial output. NOTE: MIDI will not output in debugging mode because the serial port interferes with it.
 //#define SERIAL_DEBUG (1)
 
-#define SENSOR_IN_PIN (0)
-#define SENSOR_VALUE_THRESHOLD (100) //This sensor is actually more of a binary "on/off" reading of 1023 or 0, but this threshold still allows the code below to work.
+#define NUM_SENSORS (2)
+const byte sensor_pins[NUM_SENSORS] = {0, 1};
+const int sensor_thresholds[NUM_SENSORS] = {100, 100}; //Used in case the sensors read different values
+
 #define LOOP_SLEEP_MS (100) // Milliseconds to sleep/delay at the end of each loop iteration.
 
 //Variables for pitch changing mode
@@ -26,8 +28,8 @@
 #define VELOCITY_DECREASE_SIZE (10)
 #define DEFAULT_VELOCITY (100)
 
-int velocity = DEFAULT_VELOCITY;
-byte pitch = DEFAULT_PITCH;
+byte velocities[NUM_SENSORS];
+byte pitches[NUM_SENSORS];
 
 //Set this to PITCH_CHANGE_MODE if you want pitch to change up and down. 
 //Set this to VELOCITY_CHANGE_MODE if you want velocity to change up and down.
@@ -36,6 +38,12 @@ byte mode = VELOCITY_CHANGE_MODE;
 byte channel = 0; //MIDI channel to output on. I'm not sure what happens if you change this.
 
 void setup() {
+  //Initialize the default values
+  for (int sensor_num; sensor_num < NUM_SENSORS; sensor_num++) {
+    velocities[sensor_num] = DEFAULT_VELOCITY;
+    pitches[sensor_num] = DEFAULT_PITCH;
+  }
+
 #ifdef SERIAL_DEBUG
   Serial.begin(9600);
   while (!Serial) { // needed to keep leonardo/micro from starting too fast!
@@ -45,9 +53,9 @@ void setup() {
 #endif
 }
 
-int read_value() {
+int read_value(int sensor_num) {
   int val = 0;
-  val = analogRead(SENSOR_IN_PIN);
+  val = analogRead(sensor_pins[sensor_num]);
 
 #ifdef SERIAL_DEBUG
   Serial.print("Sensor read: "); Serial.println(val);
@@ -56,66 +64,68 @@ int read_value() {
   return val;
 }
 
-void increase_velocity() {
-  velocity += VELOCITY_INCREASE_SIZE;
-  if (velocity > MAX_VELOCITY) {
-    velocity = MAX_VELOCITY;
+void increase_velocity(int sensor_num) {
+  velocities[sensor_num] += VELOCITY_INCREASE_SIZE;
+  if (velocities[sensor_num] > MAX_VELOCITY) {
+    velocities[sensor_num] = MAX_VELOCITY;
   }
 }
 
-void decrease_velocity() {
-  velocity -= VELOCITY_DECREASE_SIZE;
-  if (velocity < MIN_VELOCITY) {
-    velocity = MIN_VELOCITY;
+void decrease_velocity(int sensor_num) {
+  velocities[sensor_num] -= VELOCITY_DECREASE_SIZE;
+  if (velocities[sensor_num] < MIN_VELOCITY) {
+    velocities[sensor_num] = MIN_VELOCITY;
   }
 }
 
-void increase_pitch() {
-  pitch += PITCH_INCREASE_SIZE;
-  if (pitch > MAX_PITCH) {
-    pitch = MAX_PITCH;
+void increase_pitch(int sensor_num) {
+  pitches[sensor_num] += PITCH_INCREASE_SIZE;
+  if (pitches[sensor_num] > MAX_PITCH) {
+    pitches[sensor_num] = MAX_PITCH;
   }
 }
 
-void decrease_pitch() {
-  pitch -= PITCH_DECREASE_SIZE;
-  if (pitch < MIN_PITCH) {
-    pitch = MIN_PITCH;
+void decrease_pitch(int sensor_num) {
+  pitches[sensor_num] -= PITCH_DECREASE_SIZE;
+  if (pitches[sensor_num] < MIN_PITCH) {
+    pitches[sensor_num] = MIN_PITCH;
   }
 }
 
 
-void set_midi() {
+void set_midi(byte pitch, byte velocity) {
 #ifndef SERIAL_DEBUG //Prevents this following from being executed if in serial debug mode
-  midiEventPacket_t noteOn = {0x09, (byte)(0x90 | channel), pitch, (byte)velocity};
+  midiEventPacket_t noteOn = {0x09, (byte)(0x90 | channel), pitch, velocity};
   MidiUSB.sendMIDI(noteOn);
   MidiUSB.flush();
 #else
-  Serial.print("MIDI packet velocity: "); Serial.print((byte)velocity); Serial.print(" , pitch: "); Serial.println((byte)pitch);
+  Serial.print("MIDI packet velocity: "); Serial.print(velocity); Serial.print(" , pitch: "); Serial.println(pitch);
 #endif
 }
 
 void loop() {
-  int new_value = read_value();
-  
-  if (new_value < SENSOR_VALUE_THRESHOLD) {
-    if (mode == VELOCITY_CHANGE_MODE) {
-      increase_velocity();
-    }
+  for (int sensor_num = 0; sensor_num < NUM_SENSORS; sensor_num++) {
+    int new_value = read_value(sensor_num);
+    
+    if (new_value < sensor_thresholds[sensor_num]) {
+      if (mode == VELOCITY_CHANGE_MODE) {
+        increase_velocity(sensor_num);
+      }
+      else {
+        increase_pitch(sensor_num);
+      }
+    } 
     else {
-      increase_pitch();
+      if (mode == VELOCITY_CHANGE_MODE) {
+        decrease_velocity(sensor_num);
+      }
+      else {
+        decrease_pitch(sensor_num);
+      }
     }
-  } 
-  else {
-    if (mode == VELOCITY_CHANGE_MODE) {
-      decrease_velocity();
-    }
-    else {
-      decrease_pitch();
-    }
-  }
 
-  set_midi();
+    set_midi(pitches[sensor_num], velocities[sensor_num]);
+  }
   delay(LOOP_SLEEP_MS);
 }
 
