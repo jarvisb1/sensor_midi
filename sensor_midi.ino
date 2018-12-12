@@ -57,7 +57,7 @@ int read_value(int sensor_num) {
   val = analogRead(sensor_pins[sensor_num]);
 
 #ifdef SERIAL_DEBUG
-  Serial.print("Sensor read: "); Serial.println(val);
+  Serial.print("Sensor "); Serial.print(sensor_num); Serial.print(" read: "); Serial.println(val);
 #endif
 
   return val;
@@ -98,7 +98,7 @@ void set_midi(byte channel, byte pitch, byte velocity) {
   MidiUSB.sendMIDI(noteOn);
   MidiUSB.flush();
 #else
-  Serial.print("MIDI packet velocity: "); Serial.print(velocity); Serial.print(" , pitch: "); Serial.println(pitch);
+  Serial.print("MIDI channel "); Serial.print(channel); Serial.print(" packet velocity: "); Serial.print(velocity); Serial.print(" , pitch: "); Serial.println(pitch);
 #endif
 }
 
